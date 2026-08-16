@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHNet‑CMAPSS · Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" width="30" height="30" viewBox="0 0 40 40" fill="none">
+      <circle cx="20" cy="20" r="18" stroke="var(--amber)" stroke-width="1.4" opacity="0.6"/>
+      <circle cx="20" cy="20" r="12" stroke="var(--teal)" stroke-width="1.4" opacity="0.85"/>
+      <circle cx="20" cy="20" r="3" fill="var(--amber)"/>
+      <path d="M20 2 V8 M20 32 V38 M2 20 H8 M32 20 H38" stroke="var(--line-bright)" stroke-width="1.2"/>
+    </svg>
+    <div class="brand-text">
+      <div class="brand-title">PHNet‑CMAPSS</div>
+      <div class="brand-sub">Predictive‑Maintenance Mission Control</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="data-clock" id="clock">— : — : —</div>
+    <div class="status-pill" id="global-status" data-state="idle">
+      <span class="status-dot"></span>
+      <span class="status-text">STANDBY</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+
+  <!-- ============ LEFT: CHECKLIST / CONTROL COLUMN ============ -->
+  <aside class="control-col">
+
+    <div class="panel control-panel">
+      <div class="panel-label">Run configuration</div>
+
+      <div class="field">
+        <label for="mode-select">Preset</label>
+        <select id="mode-select">
+          <option value="quick" selected>Quick demo — small dims, ~1 min, synthetic‑fallback data</option>
+          <option value="full">Full research — original paper hyperparameters (slow)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="seed-input">Random seed</label>
+        <input id="seed-input" type="number" value="42" min="0" max="99999" />
+      </div>
+
+      <button id="run-btn" class="run-switch">
+        <span class="run-switch-glow"></span>
+        <span class="run-switch-label">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" id="run-icon">
+            <path d="M7 5v14l11-7z" fill="currentColor"/>
+          </svg>
+          RUN PIPELINE
+        </span>
+      </button>
+      <div class="run-hint" id="run-hint">All 11 stages execute end‑to‑end, in your browser‑connected local process.</div>
+    </div>
+
+    <div class="panel checklist-panel">
+      <div class="panel-label">Flight checklist</div>
+      <ol class="checklist" id="checklist"><!-- populated by JS --></ol>
+    </div>
+
+  </aside>
+
+  <!-- ============ RIGHT: MAIN VIEW ============ -->
+  <main class="main-col">
+
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="terminal">Live Log</button>
+      <button class="tab" data-tab="charts">Charts</button>
+      <button class="tab" data-tab="ablation">Ablation</button>
+      <button class="tab" data-tab="sensors">Sensor Ranking</button>
+    </nav>
+
+    <!-- ---------------- OVERVIEW ---------------- -->
+    <section class="tab-panel active" id="tab-overview">
+
+      <div class="gauge-row">
+        <div class="gauge-card">
+          <svg class="gauge" viewBox="0 0 160 100" id="gauge-auc"></svg>
+          <div class="gauge-caption">Anomaly AUC‑ROC</div>
+          <div class="gauge-value" id="val-auc">—</div>
+        </div>
+        <div class="gauge-card">
+          <svg class="gauge" viewBox="0 0 160 100" id="gauge-f1"></svg>
+          <div class="gauge-caption">Fault Macro‑F1</div>
+          <div class="gauge-value" id="val-f1">—</div>
+        </div>
+        <div class="gauge-card">
+          <svg class="gauge" viewBox="0 0 160 100" id="gauge-rmse"></svg>
+          <div class="gauge-caption">RUL RMSE (gated ensemble)</div>
+          <div class="gauge-value" id="val-rmse">—</div>
+        </div>
+        <div class="gauge-card">
+          <svg class="gauge" viewBox="0 0 160 100" id="gauge-ece"></svg>
+          <div class="gauge-caption">Calibration Error (ECE)</div>
+          <div class="gauge-value" id="val-ece">—</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-label">Run summary</div>
+          <table class="kv-table" id="summary-table">
+            <tr><td>Data source</td><td class="v" id="s-source">—</td></tr>
+            <tr><td>Device</td><td class="v" id="s-device">—</td></tr>
+            <tr><td>Total sequences</td><td class="v" id="s-n">—</td></tr>
+            <tr><td>Train / Val / Holdout split</td><td class="v" id="s-split">—</td></tr>
+            <tr><td>Adaptive threshold (EVT‑POT)</td><td class="v" id="s-threshold">—</td></tr>
+            <tr><td>RUL RMSE — deep head</td><td class="v" id="s-rmse-deep">—</td></tr>
+            <tr><td>RUL RMSE — GBR baseline</td><td class="v" id="s-rmse-gbr">—</td></tr>
+          </table>
+        </div>
+
+        <div class="panel">
+          <div class="panel-label">Statistical significance</div>
+          <table class="kv-table" id="sig-table">
+            <tr><td>McNemar (anomaly flag vs. GBR proxy)</td><td class="v" id="s-mcnemar">—</td></tr>
+            <tr><td>Wilcoxon signed‑rank (|RUL residual|)</td><td class="v" id="s-wilcoxon">—</td></tr>
+          </table>
+          <div class="panel-label" style="margin-top:16px;">MC‑Dropout uncertainty (mean std, per autoencoder)</div>
+          <table class="kv-table" id="uncertainty-table"></table>
+        </div>
+      </div>
+
+      <div class="panel empty-state" id="overview-empty">
+        <div class="empty-icon">◎</div>
+        <div class="empty-title">No run yet</div>
+        <div class="empty-body">Set a preset on the left and press <strong>RUN PIPELINE</strong>. Live telemetry
+          will stream to the Live Log tab, and gauges here will sweep to their final readings the moment
+          the holdout evaluation stage completes.</div>
+      </div>
+    </section>
+
+    <!-- ---------------- LIVE LOG ---------------- -->
+    <section class="tab-panel" id="tab-terminal">
+      <div class="panel terminal-panel">
+        <div class="panel-label">Live telemetry</div>
+        <div class="terminal" id="terminal"><div class="term-line dim">Awaiting run…</div></div>
+      </div>
+    </section>
+
+    <!-- ---------------- CHARTS ---------------- -->
+    <section class="tab-panel" id="tab-charts">
+      <div class="chart-grid" id="chart-grid">
+        <div class="panel empty-state"><div class="empty-icon">▤</div><div class="empty-title">No figures yet</div>
+        <div class="empty-body">Charts render here once the pipeline finishes rendering figures (final stage).</div></div>
+      </div>
+    </section>
+
+    <!-- ---------------- ABLATION ---------------- -->
+    <section class="tab-panel" id="tab-ablation">
+      <div class="panel">
+        <div class="panel-label">Architectural ablation — RUL RMSE / Anomaly AUC</div>
+        <table class="data-table" id="ablation-table">
+          <thead><tr><th>Variant</th><th>RUL RMSE</th><th>Anomaly AUC</th></tr></thead>
+          <tbody><tr><td colspan="3" class="dim">Run the pipeline to populate this table.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---------------- SENSORS ---------------- -->
+    <section class="tab-panel" id="tab-sensors">
+      <div class="panel">
+        <div class="panel-label">Top sensors by Integrated‑Gradients importance</div>
+        <div id="sensor-bars" class="sensor-bars">
+          <div class="dim">Run the pipeline to populate sensor rankings.</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
